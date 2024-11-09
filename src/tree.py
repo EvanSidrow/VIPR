@@ -156,8 +156,8 @@ class Tree:
                     ancestor_parent.children_edge_length.append(edge_length)
 
                     # evaluate likelihood of transition
-                    P = 0.25*(1-np.exp(-edge_length))*np.ones((4,4))
-                    P = P + np.eye(4)*(np.exp(-edge_length))
+                    P = 0.25*(1-np.exp(-4*edge_length/3))*np.ones((4,4))
+                    P = P + np.eye(4)*(np.exp(-4*edge_length/3))
                     ancestor_parent.log_probs = ancestor_parent.log_probs + logdotexp(ancestor.log_probs,np.log(P))
 
                 # update q
