@@ -14,11 +14,9 @@ class Node:
 
         self.name = name
         self.leaves = set([])
-        self.children = []
-        self.children_edge_length = []
         self.parent = None
-        self.parent_edge_length = None
-        self.coal_time = None
+        self.children = []
+        self.coal_time = 0.0
         self.log_probs = log_probs
 
 
@@ -29,7 +27,7 @@ class Tree:
         # basic properties
         self.theta = theta
         self.log_times = log_times
-        self.n = tree_log_probs.shape[0]
+        self.ntaxa = tree_log_probs.shape[0]
         self.ngenes = tree_log_probs.shape[1]
         if pop_size is None:
             self.pop_size = 1.0
@@ -45,18 +43,17 @@ class Tree:
 
         # initialize leaves
         self.leaves = []
-        for leaf_num in range(self.n):
+        for leaf_num in range(self.ntaxa):
             self.leaves.append(Node(leaf_num,tree_log_probs[leaf_num]))
-            self.leaves[-1].coal_time = 0.0
             self.leaves[-1].leaves.add(leaf_num)
 
         # initialize nodes
         self.nodes = []
-        for node_num in range(self.n,2*self.n-1):
+        for node_num in range(self.ntaxa,2*self.ntaxa-1):
             self.nodes.append(Node(node_num,np.zeros((self.ngenes,4))))
 
         # initialze all coal_times
-        self.coal_times = np.zeros(self.n)
+        self.coal_times = np.zeros(self.ntaxa)
 
         # draw graph
         self.draw_graph()
@@ -65,7 +62,6 @@ class Tree:
     def find_ancestors(self,leaf_nums_to_join):
 
         ancestors = []
-
         for leaf_num in leaf_nums_to_join:
             ancestor = self.leaves[leaf_num]
             while ancestor.parent is not None:
@@ -119,14 +115,17 @@ class Tree:
         if pop_size is None:
             pop_size = self.pop_size
 
-        node_leaf_nums = [[i] for i in range(self.n)]
+        node_leaf_nums = [[i] for i in range(self.ntaxa)]
         ravel_log_times = np.ravel(log_times)
         node_num = 0
         prev_coal_time = 0 # for prior update
 
-        for log_coal_time in np.sort(ravel_log_times):
+        for ind in np.argsort(ravel_log_times):
 
-            leave_nums_to_join = np.unravel_index(np.where(ravel_log_times == log_coal_time)[0][0],log_times.shape)
+            if ind == 0:
+                break
+
+            leave_nums_to_join = np.unravel_index(ind,log_times.shape)
 
             # find ancestors of leaves to join
             ancestors = self.find_ancestors(leave_nums_to_join)
@@ -137,7 +136,7 @@ class Tree:
             if not leaves_joined:
 
                 # get coal time from log
-                coal_time = np.exp(log_coal_time)
+                coal_time = np.exp(ravel_log_times[ind])
 
                 # grab a node to define as a parent
                 ancestor_parent = self.nodes[node_num]
@@ -146,14 +145,12 @@ class Tree:
 
                 for ancestor in ancestors:
 
-                    # set parent and child equal to each other
+                    # set parent and children
                     ancestor.parent = ancestor_parent
                     ancestor_parent.children.append(ancestor)
 
                     # set the edge lengths
                     edge_length = coal_time-ancestor.coal_time
-                    ancestor.parent_edge_length = edge_length
-                    ancestor_parent.children_edge_length.append(edge_length)
 
                     # evaluate likelihood of transition
                     P = 0.25*(1-np.exp(-4*edge_length/3))*np.ones((4,4))
@@ -164,7 +161,7 @@ class Tree:
                 self.update_q(ancestors)
 
                 # update prior
-                k = self.n - node_num
+                k = self.ntaxa - node_num
                 rate = k*(k-1) / (2*self.pop_size)
                 self.log_prior = self.log_prior + np.log(rate) - rate*(coal_time-prev_coal_time)
                 self.log_prior = self.log_prior - np.log(k*(k-1)/2)
