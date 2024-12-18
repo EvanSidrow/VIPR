@@ -1,17 +1,12 @@
-import autograd.numpy as np
-from autograd.scipy.special import logsumexp,erf
-from autograd.scipy.stats import norm
-from autograd import grad
-
-import argparse
-#from autograd_gamma import gamma, gammainc, gammaincc, gammaincln, gammainccln
-
 import matplotlib.pyplot as plt
-from copy import deepcopy
+import numpy as np
+import torch
+import argparse
 from itertools import product
 from itertools import combinations
 import pickle
 import datetime
+from scipy.special import logsumexp
 
 from Bio.Phylo.TreeConstruction import _DistanceMatrix
 from Bio.Phylo.TreeConstruction import DistanceTreeConstructor
@@ -19,13 +14,14 @@ from Bio.Phylo.TreeConstruction import DistanceCalculator
 from io import StringIO
 from Bio import Phylo
 
-from tree import Tree
-from optimizer import Optimizer
+from tree_torch import Tree
+from SLCVI_torch import SLCVI
 
 import warnings
 warnings.filterwarnings('ignore')
 
 np.random.seed(0)
+torch.manual_seed(0)
 
 parser = argparse.ArgumentParser()
 
@@ -34,8 +30,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help=' HCV ')
 parser.add_argument('--batch_size', type=int, required=True, help=' HCV ')
 parser.add_argument('--max_iters', type=int, required=True, help=' HCV ')
-parser.add_argument('--alpha_start', type=float, default=0.1, help=' HCV ')
-parser.add_argument('--alpha_end', type=float, default=0.01, help=' HCV ')
+parser.add_argument('--record_every', type=int, required=True)
+parser.add_argument('--test_batch_size', type=int, required=True)
+parser.add_argument('--method', type=str, required=True)
+parser.add_argument('--anneal_freq', type=int, default=1, help=' HCV ')
+parser.add_argument('--anneal_rate', type=float, default=1.0, help=' HCV ')
+parser.add_argument('--linear_decay', type=bool, default=False, help=' HCV ')
+parser.add_argument('--alpha', type=float, default=0.1, help=' HCV ')
 parser.add_argument('--pop_size', type=float, default=5.0, help=' HCV ')
 
 args = parser.parse_args()
@@ -47,9 +48,7 @@ pop_size = args.pop_size
 
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 data_file = 'dat/'+data_set+'/'+data_set+'.pickle'
-reparam_file = 'results/'+data_set+'/'+data_set+'_'+time+'_reparam.pickle'
-reinforce_file = 'results/'+data_set+'/'+data_set+'_'+time+'_reinforce.pickle'
-VIMCO_file = 'results/'+data_set+'/'+data_set+'_'+time+'_VIMCO.pickle'
+out_file = 'results/'+data_set+'/'+data_set+'_'+time+'_'+args.method+'.pickle'
 
 with open(data_file, 'rb') as f:
     ds = pickle.load(f)
@@ -70,9 +69,9 @@ nuc2vec = {'A':[1.,0.,0.,0.], 'G':[0.,1.,0.,0.], 'C':[0.,0.,1.,0.], 'T':[0.,0.,0
            'M':[1.,0.,1.,0.], 'B':[0.,1.,1.,1.], 'D':[1.,1.,0.,1.], 'H':[1.,0.,1.,1.],
            'V':[1.,1.,1.,0.], '.':[1.,1.,1.,1.], 'U':[0.,0.,0.,1.]}
 
-tree_log_probs = np.array([[nuc2vec[g] for g in genome] for genome in genomes],
-                                dtype = float)
-tree_log_probs = np.log(tree_log_probs)
+tree_log_probs = torch.tensor([[nuc2vec[g] for g in genome] for genome in genomes],
+                                dtype = torch.float64)
+tree_log_probs = torch.log(tree_log_probs)
 
 #######
 
@@ -93,44 +92,24 @@ calculator = DistanceCalculator('identity')
 constructor = DistanceTreeConstructor(calculator, 'nj')
 tree = constructor.nj(m)
 
-theta = np.zeros((2,n_species,n_species))
+theta = torch.zeros((2,n_species,n_species))
 for i in range(n_species):
     for j in range(i):
         theta[0,i,j] = np.log(tree.distance(target1=species[i],target2=species[j]))
         theta[1,i,j] = -2
 #######
 
-optim_reparam = Optimizer(tree_log_probs,deepcopy(theta))
-optim_reparam.optimize_q_reparam(batch_size=batch_size,
-                                 iters=max_iters,
-                                 alphas=[args.alpha_start,args.alpha_end],
-                                 record_every=10,
-                                 test_batch_size=5*batch_size,
-                                 pop_size=pop_size)
+optim = SLCVI(tree_log_probs,theta,pop_size)
+optim.learn(batch_size=args.batch_size,
+            iters=args.max_iters,
+            alpha=args.alpha,
+            method=args.method,
+            record_every=args.record_every,
+            test_batch_size=args.test_batch_size,
+            pop_size=args.pop_size,
+            anneal_freq=args.anneal_freq,
+            anneal_rate=args.anneal_rate,
+            linear_decay=args.linear_decay)
 
-with open(reparam_file, 'wb') as file:
-    pickle.dump(optim_reparam, file)
-
-
-optim_reinforce = Optimizer(tree_log_probs,deepcopy(optim_reparam.theta))
-optim_reinforce.optimize_q_reinforce(batch_size=batch_size,
-                                     iters=max_iters,
-                                     alphas=[args.alpha_start,args.alpha_end],
-                                     record_every=10,
-                                     test_batch_size=5*batch_size,
-                                     pop_size=pop_size)
-
-with open(reinforce_file, 'wb') as file:
-    pickle.dump(optim_reinforce, file)
-
-
-optim_VIMCO = Optimizer(tree_log_probs,deepcopy(optim_reparam.theta))
-optim_VIMCO.optimize_q_VIMCO(batch_size=batch_size,
-                             iters=max_iters,
-                             alphas=[args.alpha_start,args.alpha_end],
-                             record_every=10,
-                             test_batch_size=5*batch_size,
-                             pop_size=pop_size)
-
-with open(VIMCO_file, 'wb') as file:
-    pickle.dump(optim_VIMCO, file)
+with open(out_file, 'wb') as file:
+    pickle.dump(optim, file)

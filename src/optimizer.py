@@ -4,13 +4,13 @@ from autograd.scipy.stats import norm
 #from autograd_gamma import gamma, gammainc, gammaincc, gammaincln, gammainccln
 from autograd.scipy.special import logsumexp
 
+from copy import deepcopy
+
 import matplotlib.pyplot as plt
 import datetime
 import time
 
-from misc_funcs import logdotexp
 from tree import Tree
-from copy import deepcopy
 
 class Optimizer:
 
@@ -43,12 +43,14 @@ class Optimizer:
         self.epochs = []
         self.iters = None
 
-    def record_metrics(self,i,test_batch_size,pop_size,grad_norm):
+    def record_metrics(self,i,test_batch_size,pop_size,grad_theta):
 
         self.epochs.append(i)
-        
         self.run_time += time.time()
         self.run_times.append(self.run_time)
+
+        grad_norm = np.sqrt(np.sum(grad_theta**2))
+        self.grad_norms.append(grad_norm)
 
         # estimate ELBO
         ELBO = 0
@@ -56,17 +58,19 @@ class Optimizer:
             Z = np.random.normal(size=(self.n_species,self.n_species))
             log_times = np.exp(self.theta[1])*Z+self.theta[0]
             log_times = log_times + np.triu(np.full(self.n_species, np.inf))
-            tree = Tree(self.theta,log_times,deepcopy(self.tree_log_probs),
+            tree = Tree(self.theta,
+                        log_times,
+                        deepcopy(self.tree_log_probs),
                         pop_size=pop_size)
             ELBO_hat = (tree.log_p - tree.log_q)/test_batch_size
             if not np.isnan(ELBO_hat):
                 ELBO = ELBO + ELBO_hat
 
         self.ELBO_ests.append(ELBO)
-        self.grad_norms.append(grad_norm)
 
         print("iteration: ",i)
-        print("runtime: ",np.sum(self.run_times))
+        print("runtime: %d mins"% np.floor(np.sum(self.run_times) / 60))
+        print("grad_norm estimate: ", grad_norm)
         print("ELBO estimate: ", ELBO)
         print("")
 
@@ -97,7 +101,9 @@ class Optimizer:
                 for Z in Zs:
                     log_times = np.exp(theta[1])*Z+theta[0]
                     log_times = log_times + np.triu(np.full(self.n_species, np.inf))
-                    tree = Tree(theta,log_times,deepcopy(self.tree_log_probs),
+                    tree = Tree(theta,
+                                log_times,
+                                deepcopy(self.tree_log_probs),
                                 pop_size=pop_size)
                     ELBO_hat = (tree.log_p - tree.log_q)/batch_size
                     if not np.isnan(ELBO_hat):
@@ -112,8 +118,7 @@ class Optimizer:
 
             # record metrics (don't include time)
             if i % record_every == 0:
-                grad_norm = np.sum(grad_theta**2)
-                self.record_metrics(i,test_batch_size,pop_size,grad_norm)
+                self.record_metrics(i,test_batch_size,pop_size,grad_theta)
         return
 
     def optimize_q_reinforce(self,batch_size,iters,record_every=10,test_batch_size=100,pop_size=1.0,alphas=None):
@@ -165,8 +170,7 @@ class Optimizer:
 
             # record metrics (don't include time)
             if i % record_every == 0:
-                grad_norm = np.sum(grad_theta**2)
-                self.record_metrics(i,test_batch_size,pop_size,grad_norm)
+                self.record_metrics(i,test_batch_size,pop_size,grad_theta)
         return
 
     def optimize_q_VIMCO(self,batch_size,iters,record_every=10,test_batch_size=100,pop_size=1.0,alphas=None):
@@ -215,24 +219,24 @@ class Optimizer:
 
             # calculate VIMCO estimator
             EBLO_logsumexp = logsumexp(ELBO_hats)
-            L_hat_K = EBLO_logsumexp - np.log(self.n_species)
+            L_hat_K = EBLO_logsumexp - np.log(batch_size)
             w_tilde = np.exp(ELBO_hats - EBLO_logsumexp)
 
             ELBO_logsumexp_minus_j = np.zeros(batch_size)
-            ELBO_hats_minus_j = (np.sum(ELBO_hats) - ELBO_hats)/(self.n_species-1)
+            ELBO_hats_minus_j = (np.sum(ELBO_hats) - ELBO_hats)/(batch_size-1)
             for j in range(batch_size):
-                ELBO_logsumexp_minus_j[j] = logsumexp([x if i != j else ELBO_hats_minus_j[j] for i,x in enumerate(ELBO_hats)]) - np.log(self.n_species)
+                ELBO_logsumexp_minus_j[j] = logsumexp([x if i != j else ELBO_hats_minus_j[j] for i,x in enumerate(ELBO_hats)]) - np.log(batch_size)
 
             L_hat_K_minus_j = L_hat_K - ELBO_logsumexp_minus_j
 
-            grad_theta = np.sum((L_hat_K_minus_j - w_tilde)[:,None,None,None]*grad_q_hats,axis = 0)
+            weights = L_hat_K_minus_j - w_tilde
+            grad_theta = np.sum(weights[:,None,None,None]*grad_q_hats,axis = 0)
 
             self.update_theta(grad_theta)
 
             # record metrics (don't include time)
             if i % record_every == 0:
-                grad_norm = np.sum(grad_theta**2)
-                self.record_metrics(i,test_batch_size,pop_size,grad_norm)
+                self.record_metrics(i,test_batch_size,pop_size,grad_theta)
         return
 
     def update_theta(self,grad):
