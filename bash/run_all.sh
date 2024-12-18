@@ -6,6 +6,6 @@ python src/train_model_torch.py --dataset $1 --batch_size 10 --max_iters 1000 \
 bash bash/run_beast.sh $1
 
 # run VBPI baseline for each data set
-python src/vbpi-torch/rooted/main_slurm.py --dataset $1 --coalescent_type fixed_pop \
+python src/vbpi-torch/rooted/main.py --dataset $1 --coalescent_type fixed_pop \
 --clock_type fixed_rate --init_clock_rate 1.0 \
 --log_pop_size_offset 1.6094379124341003 --burnin 250 --nParticle 10 --psp

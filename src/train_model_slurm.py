@@ -63,9 +63,6 @@ print("initial step size: ", alpha)
 print("output file: ", out_file)
 print("")
 
-if not os.path.exists('../results/'+dataset):
-    os.makedirs('../results/'+dataset)
-
 with open(data_file, 'rb') as f:
     ds = pickle.load(f)
 
@@ -77,13 +74,12 @@ for key in ds:
 
 n_species = len(species)
 
-
 # From https://github.com/zcrabbit/vbpi-torch/blob/ff86cf0c47a5753f5cc5b4dfe0b6ed783ab22669/unrooted/phyloModel.py#L7-L11
 nuc2vec = {'A':[1.,0.,0.,0.], 'G':[0.,1.,0.,0.], 'C':[0.,0.,1.,0.], 'T':[0.,0.,0.,1.],
            '-':[1.,1.,1.,1.], '?':[1.,1.,1.,1.], 'N':[1.,1.,1.,1.], 'R':[1.,1.,0.,0.],
            'Y':[0.,0.,1.,1.], 'S':[0.,1.,1.,0.], 'W':[1.,0.,0.,1.], 'K':[0.,1.,0.,1.],
            'M':[1.,0.,1.,0.], 'B':[0.,1.,1.,1.], 'D':[1.,1.,0.,1.], 'H':[1.,0.,1.,1.],
-           'V':[1.,1.,1.,0.], '.':[1.,1.,1.,1.], 'U':[0.,0.,0.,1.]}
+           'V':[1.,1.,1.,0.], '.':[1.,1.,1.,1.], 'U':[0.,0.,0.,1.], 'n':[1.,1.,1.,1.]}
 
 tree_log_probs = torch.tensor([[nuc2vec[g] for g in genome] for genome in genomes],
                                 dtype = torch.float64)

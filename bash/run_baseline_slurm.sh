@@ -12,8 +12,8 @@
 #SBATCH --mem-per-cpu=16G
 #SBATCH --array=0-131
 
-module load python/3.9
-module load scipy-stack
+module load StdEnv/2023
+module load scipy-stack/2024b
 
 python src/vbpi-torch/rooted/main_slurm.py --pid $SLURM_ARRAY_TASK_ID \
 --coalescent_type fixed_pop --clock_type fixed_rate --init_clock_rate 1.0 \
