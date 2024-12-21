@@ -49,11 +49,16 @@ linear_decay = True
 anneal_freq = 1
 anneal_rate = 1.0
 pop_size = 5.0
+max_time = 12.0 # HOURS
 
 # select output file
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 data_file = 'dat/'+dataset+'/'+dataset+'.pickle'
 out_file = 'results/'+dataset+'/'+dataset+'_'+method+'_'+str(batch_size)+'_'+str(alpha)+'.pickle'
+
+if os.path.isfile(out_file):
+    print("file %s already exits. Exiting..."%out_file)
+    exit()
 
 # print off initial values
 print("dataset: ", dataset)
@@ -121,7 +126,8 @@ optim.learn(batch_size=batch_size,
             pop_size=pop_size,
             anneal_freq=anneal_freq,
             anneal_rate=anneal_rate,
-            linear_decay=linear_decay)
+            linear_decay=linear_decay,
+            max_time=max_time)
 
 with open(out_file, 'wb') as file:
     pickle.dump(optim, file)

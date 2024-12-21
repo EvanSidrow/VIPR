@@ -30,7 +30,7 @@ do
 done
 
 # run ground truth
-beast -overwrite -prefix golden_ "$1_golden.xml"
-mv "golden_$1.trees" "$1_fixed_pop_golden_run.trees"
-mv "golden_$1.log" "$1_fixed_pop_golden_run.log"
-mv "golden_$1.ops" "$1_fixed_pop_golden_run.ops"
+#beast -overwrite -prefix golden_ "$1_golden.xml"
+#mv "golden_$1.trees" "$1_fixed_pop_golden_run.trees"
+#mv "golden_$1.log" "$1_fixed_pop_golden_run.log"
+#mv "golden_$1.ops" "$1_fixed_pop_golden_run.ops"

@@ -139,8 +139,8 @@ class SLCVI(nn.Module):
         return
 
     def learn(self,batch_size,iters,alpha,method="reparam",
-              anneal_freq=1,anneal_rate=1.0,record_every=10,test_batch_size=100,pop_size=1.0,
-              linear_decay=False):
+              anneal_freq=1,anneal_rate=1.0,record_every=10,test_batch_size=100,
+              pop_size=1.0,max_time=12.0,linear_decay=False):
 
         # initialize the optimizer
         self.optimizer = torch.optim.Adam([self.theta], lr=alpha)
@@ -167,5 +167,9 @@ class SLCVI(nn.Module):
                 self.optimizer.param_groups[0]['lr'] = alpha*(1-it/iters)
             elif it % anneal_freq == 0:
                 self.optimizer.param_groups[0]['lr'] *= anneal_rate
+
+            if (np.sum(self.run_times) / 3600) > max_time:
+                print("Maximum time exceeded. Exiting...")
+                return
 
         return
