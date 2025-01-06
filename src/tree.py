@@ -104,7 +104,7 @@ class Tree:
         self.log_q = self.log_q + log_cum_sfs + logsumexp(np.array(log_pdfs_over_sfs))
 
         return
-        
+
 
     def draw_graph(self,log_times=None,theta=None,pop_size=None):
 

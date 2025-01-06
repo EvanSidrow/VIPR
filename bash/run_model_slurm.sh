@@ -10,7 +10,7 @@
 
 #SBATCH --time=23:59:00
 #SBATCH --mem-per-cpu=16G
-#SBATCH --array=0-395
+#SBATCH --array=0-692
 
 module load StdEnv/2023
 module load scipy-stack/2024b

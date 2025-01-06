@@ -32,29 +32,36 @@ args = parser.parse_args()
 
 datasets = ["DS1","DS2","DS3","DS4","DS5","DS6",
             "DS7","DS8","DS9","DS10","DS11"]
-batch_sizes = [10,20,100]
-methods = ["reparam","reinforce","VIMCO"]
-alphas = [0.2,0.02,0.002,0.0002]
+methods = ["reparam","reinforce","reinforce_VIMCO"]
+alphas = [0.1,0.03,0.01,0.003,0.001,0.0003,0.0001]
+decays = ["none","linear","exp"]
 
-dataset = datasets[args.pid % 11]
-batch_size = batch_sizes[int(args.pid/11) % 3]
-method = methods[int(args.pid/33) % 3]
-alpha = alphas[int(args.pid/99) % 4]
+method = methods[args.pid % 3]
+alpha = alphas[int(args.pid/3) % 7]
+decay = decays[int(args.pid/21) % 3]
+dataset = datasets[int(args.pid/63) % 11]
 
 # keep fixed values
+batch_size = 10
 max_iters = int(100000 / batch_size)
 record_every = 10
 test_batch_size = 5*batch_size
-linear_decay = True
+if decay == "linear":
+    linear_decay = True
+else:
+    linear_decay = False
 anneal_freq = 1
-anneal_rate = 1.0
+if decay == "exp":
+    anneal_rate = 0.01**(1.0/max_iters)
+else:
+    anneal_rate = 1.0
 pop_size = 5.0
 max_time = 12.0 # HOURS
 
 # select output file
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 data_file = 'dat/'+dataset+'/'+dataset+'.pickle'
-out_file = 'results/'+dataset+'/'+dataset+'_'+method+'_'+str(batch_size)+'_'+str(alpha)+'.pickle'
+out_file = 'results/'+dataset+'/'+dataset+'_'+method+'_'+decay+'_'+str(alpha)+'_'+time+'.pickle'
 
 if os.path.isfile(out_file):
     print("file %s already exits. Exiting..."%out_file)
@@ -65,6 +72,7 @@ print("dataset: ", dataset)
 print("method: ", method)
 print("batch size: ", batch_size)
 print("initial step size: ", alpha)
+print("decay: ", decay)
 print("output file: ", out_file)
 print("")
 
@@ -112,8 +120,14 @@ tree = constructor.nj(m)
 theta = torch.zeros((2,n_species,n_species))
 for i in range(n_species):
     for j in range(i):
-        theta[0,i,j] = np.log(tree.distance(target1=species[i],target2=species[j]))
-        theta[1,i,j] = -2
+        n = sum([((x in ["A","C","T","G"]) and (y in ["A","C","T","G"])) for x,y in zip(genomes[i],genomes[j])])
+        m = tree.distance(target1=species[i],target2=species[j]) + (1/(n+2))
+        v = m*(1.0-m) / (n+1)
+        sig2 = np.log(v/(m*m) + 1.0)
+        mu = np.log(m) - sig2/2.0
+        theta[0,i,j] = mu
+        theta[1,i,j] = np.log(sig2)/2.0
+
 #######
 
 optim = SLCVI(tree_log_probs,theta,pop_size)

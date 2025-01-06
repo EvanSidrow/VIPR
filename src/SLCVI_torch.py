@@ -28,12 +28,25 @@ class SLCVI(nn.Module):
         # values from optimization
         self.optimize = None
         self.ELBO_ests = []
+        self.multi_ELBO_ests = []
         self.grad_norms = []
         self.run_time = None
         self.run_times = []
         self.epochs = []
 
-        #torch.set_num_threads(1)
+    def multisample_ELBO_reparam(self,batch_size):
+
+        ELBO_hats = torch.zeros(batch_size)
+        for i in range(batch_size):
+            Z = torch.normal(mean=0.0,std=1.0,size=(self.n_species,self.n_species))
+            log_times = torch.exp(self.theta[1])*Z+self.theta[0]
+            log_times = log_times + torch.triu(torch.full((self.n_species,self.n_species), float("Inf")))
+            tree = Tree(self.theta,
+                        log_times,
+                        self.tree_log_probs.detach(),
+                        pop_size=self.pop_size)
+            ELBO_hats[i] = tree.log_p - tree.log_q
+        return torch.logsumexp(ELBO_hats,0) - np.log(batch_size)
 
     def ELBO_reparam(self,batch_size):
 
@@ -123,15 +136,19 @@ class SLCVI(nn.Module):
         self.grad_norms.append(grad_norm)
 
         # estimate ELBO
-        Zs = torch.normal(mean=0.0,std=1.0,size=(test_batch_size,self.n_species,self.n_species))
         ELBO = self.ELBO_reparam(test_batch_size).detach()
         self.ELBO_ests.append(ELBO)
+
+        # estimate 10 sample ELBO
+        multi_ELBO = self.multisample_ELBO_reparam(test_batch_size).detach()
+        self.multi_ELBO_ests.append(multi_ELBO)
 
         print("iteration: ",iter)
         print("runtime: %d mins"% np.floor(np.sum(self.run_times) / 60))
         print("step size: ", self.optimizer.param_groups[0]['lr'])
         print("grad_norm estimate: ", grad_norm)
         print("ELBO estimate: ", ELBO.item())
+        print("%s-sample ELBO estimate: "%test_batch_size, multi_ELBO.item())
         print("")
 
         self.run_time = -time.time()
@@ -154,6 +171,12 @@ class SLCVI(nn.Module):
                 loss = -self.ELBO_reinforce(batch_size)
             elif method == 'VIMCO':
                 loss = -self.ELBO_VIMCO(batch_size)
+            elif method == "reinforce_VIMCO":
+                current_time = np.sum(self.run_times) / 3600
+                if (current_time < max_time/2) and (it < iters/2):
+                    loss = -self.ELBO_reinforce(batch_size)
+                else:
+                    loss = -self.ELBO_VIMCO(batch_size)
             else:
                 raise NotImplementedError
 
