@@ -9,6 +9,8 @@ import random
 import numpy as np
 import datetime
 
+from scipy.cluster.hierarchy import linkage
+
 from tree_torch import Tree
 
 
@@ -154,6 +156,14 @@ class SLCVI(nn.Module):
         self.run_time = -time.time()
 
         return
+
+    def ELBO_reparam_scipy(batch_size):
+
+        ELBO = 0
+        for _ in range(batch_size):
+            Z = torch.normal(mean=0.0,std=1.0,size=(self.n_species,self.n_species))
+            log_times = torch.exp(self.theta[1])*Z+self.theta[0]
+            tree = linkage([log_times[ind[0],ind[1]] for ind in combinations(range(4),2)], method="single")
 
     def learn(self,batch_size,iters,alpha,method="reparam",
               anneal_freq=1,anneal_rate=1.0,record_every=10,test_batch_size=100,

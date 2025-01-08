@@ -21,9 +21,6 @@ from SLCVI_torch import SLCVI
 import warnings
 warnings.filterwarnings('ignore')
 
-np.random.seed(0)
-torch.manual_seed(0)
-
 parser = argparse.ArgumentParser()
 
 # turn the process id into a set of parameters
@@ -33,15 +30,18 @@ args = parser.parse_args()
 datasets = ["DS1","DS2","DS3","DS4","DS5","DS6",
             "DS7","DS8","DS9","DS10","DS11"]
 methods = ["reparam","reinforce","reinforce_VIMCO"]
-alphas = [0.1,0.03,0.01,0.003,0.001,0.0003,0.0001]
-decays = ["none","linear","exp"]
+alphas = [0.03,0.01,0.003]
 
 method = methods[args.pid % 3]
-alpha = alphas[int(args.pid/3) % 7]
-decay = decays[int(args.pid/21) % 3]
-dataset = datasets[int(args.pid/63) % 11]
+alpha = alphas[int(args.pid/3) % 3]
+dataset = datasets[int(args.pid/9) % 11]
+rand_seed = int(args.pid/99)%10
+
+np.random.seed(rand_seed)
+torch.manual_seed(rand_seed)
 
 # keep fixed values
+decay = "exp"
 batch_size = 10
 max_iters = int(100000 / batch_size)
 record_every = 10
@@ -61,7 +61,7 @@ max_time = 12.0 # HOURS
 # select output file
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 data_file = 'dat/'+dataset+'/'+dataset+'.pickle'
-out_file = 'results/'+dataset+'/'+dataset+'_'+method+'_'+decay+'_'+str(alpha)+'_'+time+'.pickle'
+out_file = 'results/'+dataset+'/'+dataset+'_'+method+'_'+str(alpha)+'_'+str(rand_seed)+'_'+time+'.pickle'
 
 if os.path.isfile(out_file):
     print("file %s already exits. Exiting..."%out_file)
@@ -70,9 +70,8 @@ if os.path.isfile(out_file):
 # print off initial values
 print("dataset: ", dataset)
 print("method: ", method)
-print("batch size: ", batch_size)
 print("initial step size: ", alpha)
-print("decay: ", decay)
+print("random seed: ", rand_seed)
 print("output file: ", out_file)
 print("")
 
@@ -100,33 +99,59 @@ tree_log_probs = torch.log(tree_log_probs)
 
 #######
 
-times = np.zeros((n_species,n_species))
+treedata = ""
+ntrees = 0
 
-for i in range(n_species):
-    for j in range(n_species):
-        eq = [x != y for x,y in zip(genomes[i],genomes[j]) if ((x in ["A","C","T","G"]) and (y in ["A","C","T","G"]))]
-        p_hat = np.mean(eq)
+for i in range(10):
+    tree_file = "dat/"+dataset+"/"+dataset+"_fixed_pop_support_short_run_rep_%d.trees"%(i+1)
+    with open(tree_file, "r") as file:
+        for j,line in enumerate(file):
+            if j%10 == 0 and line.startswith("tree STATE"):
 
-        times[i,j] = np.mean(eq)
-
-matrix = []
-for i,row in enumerate(times):
-    matrix.append(list(row[:(i+1)]))
-m = _DistanceMatrix(species, matrix)
-calculator = DistanceCalculator('identity')
-constructor = DistanceTreeConstructor(calculator, 'nj')
-tree = constructor.nj(m)
+                # start at first (
+                line = line[line.find('('):]
+                # remove rate infor
+                line = line.replace("[&rate=1.0]","")
+                treedata = treedata + line + "\n"
+                ntrees += 1
 
 theta = torch.zeros((2,n_species,n_species))
-for i in range(n_species):
-    for j in range(i):
-        n = sum([((x in ["A","C","T","G"]) and (y in ["A","C","T","G"])) for x,y in zip(genomes[i],genomes[j])])
-        m = tree.distance(target1=species[i],target2=species[j]) + (1/(n+2))
-        v = m*(1.0-m) / (n+1)
-        sig2 = np.log(v/(m*m) + 1.0)
-        mu = np.log(m) - sig2/2.0
-        theta[0,i,j] = mu
-        theta[1,i,j] = np.log(sig2)/2.0
+trees = Phylo.parse(StringIO(treedata), "newick")
+log_dists = np.zeros((ntrees,n_species,n_species))
+
+for i,tree in enumerate(trees):
+    print(i/ntrees)
+    for j in range(n_species):
+        for k in range(j):
+            log_dists[i,j,k] = np.log(tree.distance(target1=str(j+1),target2=str(k+1))/2.0)
+
+for j in range(n_species):
+    for k in range(j):
+        theta[0,j,k] = np.mean(log_dists[:,j,k])
+        theta[1,j,k] = np.log(np.std(log_dists[:,j,k]))
+
+print(theta)
+
+#theta = torch.zeros((2,n_species,n_species))
+#times = torch.zeros((n_species,n_species))
+#for i in range(n_species):
+#    for j in range(n_species):
+#        eq = [x != y for x,y in zip(genomes[i],genomes[j]) if ((x in ["A","C","T","G"]) and (y in ["A","C","T","G"]))]
+#        times[i,j] = np.mean(eq) + 1/(len(eq))
+#log_times = torch.log(times) + torch.triu(torch.full((n_species,n_species), float("Inf")))
+#tree = Tree(theta,log_times,tree_log_probs,
+#            pop_size=pop_size)
+
+#for node in tree.nodes:
+#    combs = combinations(node.leaves,2)
+#    for inds in combs:
+#        inds = sorted(inds)
+#        theta[0,inds[1],inds[0]] = min(theta[0,inds[1],inds[0]],torch.log(node.coal_time))
+#        theta[1,inds[1],inds[0]] = -2
+
+# add random noise
+if rand_seed > 0:
+    theta = theta + torch.normal(mean=0.0,std=rand_seed*0.1,size=(2,n_species,n_species))
 
 #######
 
