@@ -10,7 +10,7 @@
 
 #SBATCH --time=23:59:00
 #SBATCH --mem-per-cpu=16G
-#SBATCH --array=1-11
+#SBATCH --array=1-13
 
 # add correct modules
 module load StdEnv/2023

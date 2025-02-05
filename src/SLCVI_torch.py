@@ -138,12 +138,14 @@ class SLCVI(nn.Module):
         self.grad_norms.append(grad_norm)
 
         # estimate ELBO
-        ELBO = self.ELBO_reparam(test_batch_size).detach()
-        self.ELBO_ests.append(ELBO)
+        with torch.no_grad():
 
-        # estimate 10 sample ELBO
-        multi_ELBO = self.multisample_ELBO_reparam(test_batch_size).detach()
-        self.multi_ELBO_ests.append(multi_ELBO)
+            ELBO = self.ELBO_reparam(test_batch_size)
+            self.ELBO_ests.append(ELBO)
+
+            # estimate 10 sample ELBO
+            multi_ELBO = self.multisample_ELBO_reparam(test_batch_size)
+            self.multi_ELBO_ests.append(multi_ELBO)
 
         print("iteration: ",iter)
         print("runtime: %d mins"% np.floor(np.sum(self.run_times) / 60))
@@ -166,7 +168,7 @@ class SLCVI(nn.Module):
             tree = linkage([log_times[ind[0],ind[1]] for ind in combinations(range(4),2)], method="single")
 
     def learn(self,batch_size,iters,alpha,method="reparam",
-              anneal_freq=1,anneal_rate=1.0,record_every=10,test_batch_size=100,
+              anneal_freq=1,anneal_rate=1.0,record_every=100,test_batch_size=500,
               pop_size=1.0,max_time=12.0,linear_decay=False):
 
         # initialize the optimizer

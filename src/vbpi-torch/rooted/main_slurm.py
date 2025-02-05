@@ -8,6 +8,7 @@ import time
 import math
 import numpy as np
 import datetime
+import torch
 
 parser = argparse.ArgumentParser()
 
@@ -35,8 +36,8 @@ parser.add_argument('--stepszBranch', type=float, default=0.001, help=' step siz
 parser.add_argument('--stepszCoalescent', type=float, default=0.001, help=' step size for coalescent parameters ')
 parser.add_argument('--stepszClock', type=float, default=0.001, help=' step size for clock rate parameters ')
 parser.add_argument('--maxIter', type=int, default=200000, help=' number of iterations for training')
-parser.add_argument('--invT0', type=float, default=0.001, help=' initial inverse temperature for annealing schedule ')
-parser.add_argument('--nwarmStart', type=int, default=50000, help=' number of warm start iterations ')
+parser.add_argument('--invT0', type=float, default=1.0, help=' initial inverse temperature for annealing schedule ')
+parser.add_argument('--nwarmStart', type=int, default=1, help=' number of warm start iterations ')
 parser.add_argument('--nParticle', type=int, default=10, help=' number of particles for variational objectives ')
 parser.add_argument('--ar', type=float, default=0.75, help=' step size anneal rate ')
 parser.add_argument('--af', type=int, default=20000, help=' step size anneal frequency ')
@@ -47,19 +48,23 @@ parser.add_argument('--gradMethod', type=str, default='vimco', help=' vimco | rw
 args = parser.parse_args()
 
 datasets = ["DS1","DS2","DS3","DS4","DS5","DS6",
-            "DS7","DS8","DS9","DS10","DS11"]
-batch_sizes = [10,20,100]
-alphas = [0.01,0.001,0.0001,0.00001]
+            "DS7","DS8","DS9","DS10","DS11","DS14"]
+batch_sizes = [10,20]
+alphas = [0.003,0.001,0.0003,0.0001]
 
-args.dataset = datasets[args.pid % 11]
-args.nParticle = batch_sizes[int(args.pid/11) % 3]
-args.alpha = alphas[int(args.pid/33) % 4]
+args.dataset = datasets[args.pid % 12]
+args.nParticle = batch_sizes[int(args.pid/12) % 2]
+args.alpha = alphas[int(args.pid/24) % 4]
+rand_seed = int(args.pid/96)
+
+np.random.seed(rand_seed)
+torch.manual_seed(rand_seed)
 
 args.result_folder = 'results/' + args.dataset
 args.save_to_path = args.result_folder + '/' + args.supportType + '_' + args.gradMethod + '_' + str(args.nParticle) + '_' + str(args.alpha)
 if args.psp:
     args.save_to_path = args.save_to_path + '_psp'
-args.save_to_path = args.save_to_path + '_' + args.coalescent_type + '_' + args.clock_type + '_'  + str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")) + '.pt'
+args.save_to_path = args.save_to_path + '_' + args.coalescent_type + '_' + args.clock_type + '_' + str(rand_seed) + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")) + '.pt'
 
 if os.path.isfile(args.save_to_path):
     print("file %s already exits. Exiting..."%args.save_to_path)
@@ -114,11 +119,12 @@ print('\nVBPI running, results will be saved to: {}\n'.format(args.save_to_path)
 
 # run vbpi.
 # the trained model will be saved to 'results/DS1/mcmc_vimco_10_psp_constant_fixed.pt'.
-test_lb, test_kl_div, run_times, its = model.learn(args.alpha, maxiter=args.maxIter, max_time=args.max_time,
+test_lb, test_ELBO, test_kl_div, run_times, its = model.learn(args.alpha, maxiter=args.maxIter, max_time=args.max_time,
                                                    n_particles=args.nParticle, warm_start_interval=args.nwarmStart,
                                                    method='vimco',save_to_path=args.save_to_path)
 
 np.save(args.save_to_path.replace('.pt', '_test_lb.npy'), test_lb)
+np.save(args.save_to_path.replace('.pt', '_test_ELBO.npy'), test_ELBO)
 np.save(args.save_to_path.replace('.pt', '_run_time.npy'), run_times)
 np.save(args.save_to_path.replace('.pt', '_iters.npy'), its)
 if args.empFreq:

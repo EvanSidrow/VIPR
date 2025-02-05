@@ -25,17 +25,19 @@ parser = argparse.ArgumentParser()
 
 # turn the process id into a set of parameters
 parser.add_argument('--pid', type=int, required=True, help=' HCV ')
+parser.add_argument('--prev_file', type=str, default=None, help=' HCV ')
 args = parser.parse_args()
 
 datasets = ["DS1","DS2","DS3","DS4","DS5","DS6",
-            "DS7","DS8","DS9","DS10","DS11"]
-methods = ["reparam","reinforce","reinforce_VIMCO"]
-alphas = [0.03,0.01,0.003]
+            "DS7","DS8","DS9","DS10","DS11","DS14"]
+#datasets = ["DS14"]
+methods = ["reparam","reinforce","VIMCO"]
+alphas = [0.03,0.01,0.003,0.001]
 
 method = methods[args.pid % 3]
-alpha = alphas[int(args.pid/3) % 3]
-dataset = datasets[int(args.pid/9) % 11]
-rand_seed = int(args.pid/99)%10
+alpha = alphas[int(args.pid/3) % 4]
+dataset = datasets[int(args.pid/12) % 12]
+rand_seed = int(args.pid/144)
 
 np.random.seed(rand_seed)
 torch.manual_seed(rand_seed)
@@ -43,20 +45,17 @@ torch.manual_seed(rand_seed)
 # keep fixed values
 decay = "exp"
 batch_size = 10
-max_iters = int(100000 / batch_size)
-record_every = 10
-test_batch_size = 5*batch_size
+max_iters = 10000
+record_every = 100
+test_batch_size = 500
 if decay == "linear":
     linear_decay = True
 else:
     linear_decay = False
 anneal_freq = 1
-if decay == "exp":
-    anneal_rate = 0.01**(1.0/max_iters)
-else:
-    anneal_rate = 1.0
+anneal_rate = 0.01**(1.0/10000)
 pop_size = 5.0
-max_time = 12.0 # HOURS
+max_time = 24.0 # HOURS
 
 # select output file
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -93,6 +92,9 @@ nuc2vec = {'A':[1.,0.,0.,0.], 'G':[0.,1.,0.,0.], 'C':[0.,0.,1.,0.], 'T':[0.,0.,0
            'M':[1.,0.,1.,0.], 'B':[0.,1.,1.,1.], 'D':[1.,1.,0.,1.], 'H':[1.,0.,1.,1.],
            'V':[1.,1.,1.,0.], '.':[1.,1.,1.,1.], 'U':[0.,0.,0.,1.], 'n':[1.,1.,1.,1.]}
 
+for key in list(nuc2vec):
+    nuc2vec[key.lower()] = nuc2vec[key]
+
 tree_log_probs = torch.tensor([[nuc2vec[g] for g in genome] for genome in genomes],
                                 dtype = torch.float64)
 tree_log_probs = torch.log(tree_log_probs)
@@ -120,7 +122,6 @@ trees = Phylo.parse(StringIO(treedata), "newick")
 log_dists = np.zeros((ntrees,n_species,n_species))
 
 for i,tree in enumerate(trees):
-    print(i/ntrees)
     for j in range(n_species):
         for k in range(j):
             log_dists[i,j,k] = np.log(tree.distance(target1=str(j+1),target2=str(k+1))/2.0)
@@ -129,8 +130,6 @@ for j in range(n_species):
     for k in range(j):
         theta[0,j,k] = np.mean(log_dists[:,j,k])
         theta[1,j,k] = np.log(np.std(log_dists[:,j,k]))
-
-print(theta)
 
 #theta = torch.zeros((2,n_species,n_species))
 #times = torch.zeros((n_species,n_species))
@@ -155,7 +154,12 @@ if rand_seed > 0:
 
 #######
 
-optim = SLCVI(tree_log_probs,theta,pop_size)
+if args.prev_file:
+    with open(args.prev_file, 'rb') as f:
+        optim = pickle.load(f)
+else:
+    optim = SLCVI(tree_log_probs,theta,pop_size)
+
 optim.learn(batch_size=batch_size,
             iters=max_iters,
             alpha=alpha,

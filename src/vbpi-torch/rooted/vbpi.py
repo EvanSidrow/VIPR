@@ -178,10 +178,14 @@ class VBPI(nn.Module):
         rws_fake_term = torch.sum(snis_wts.detach() * logq_tree, dim=0)
         return temp_lower_bound, rws_fake_term, lower_bound, logll[-1], samp_logp_coalescent_prior[-1], torch.mean(height[:,0])
 
-    def learn(self, stepsz, maxiter=100000, test_freq=1000, lb_test_freq=1000, anneal_freq=20000, anneal_rate=0.75, n_particles=10,
+    def learn(self, stepsz, maxiter=100000, test_freq=1000, lb_test_freq=100, anneal_freq=1, anneal_rate=None, n_particles=10,
               init_inverse_temp=0.001, warm_start_interval=50000, method='vimco', save_to_path=None, max_time=12.0):
         lbs, lls, lps, root_ages = [], [], [], []
-        test_kl_div, test_lb, run_times, its = [], [], [], []
+        test_kl_div, test_lb, test_ELBO, run_times, its = [], [], [], [], []
+
+        # set anneal rate
+        if anneal_rate is None:
+            anneal_rate = 0.01**(1.0/maxiter)
 
         if not isinstance(stepsz, dict):
             stepsz = {'tree': stepsz, 'branch': stepsz, 'coalescent': stepsz, 'clock': stepsz}
@@ -227,10 +231,12 @@ class VBPI(nn.Module):
                     test_kl_div.append(self.kl_div())
                     print('Iter {}:({:.1f}s) Lower Bound: {:.4f} | Logll: {:.4f} | Root Age: {:.4f} | KL: {:.6f}'.format(it, run_time, np.mean(lbs), lls[-1], np.mean(root_ages), test_kl_div[-1]))
                 else:
-                    print('Iter {}:({:.1f}s) Lower Bound: {:.4f} | Logprior: {:.4f} | Logll: {:.4f} | Root Age: {:.4f}'.format(it, run_time, np.mean(lbs), lps[-1], lls[-1], np.mean(root_ages)))
+                    print('Iter {}:({:.1f}s) Lower Bound: {:.4f} | Logprior: {:.4f} | Logll: {:.4f} | Root Age: {:.4f} | Inverse Temp: {:.4f}'.format(it, run_time, np.mean(lbs), lps[-1], lls[-1], np.mean(root_ages), inverse_temp))
 
-                test_lb.append(self.lower_bound(n_particles=1,n_runs=1000))
-                print('>>> Iter {}:({:.1f}s) Test Lower Bound: {:.4f}'.format(it, run_time, test_lb[-1]))
+                test_lb.append(self.lower_bound(n_particles=500,n_runs=1))
+                test_ELBO.append(self.lower_bound(n_particles=1,n_runs=500))
+
+                print('>>> Iter {}:({:.1f}s) Test MLL: {:.4f} | Test ELBO: {:.4f} '.format(it, run_time, test_lb[-1], test_ELBO[-1]))
                 lbs, lls, lps, root_ages = [], [], [], []
                 run_time = -time.time()
 
@@ -241,4 +247,4 @@ class VBPI(nn.Module):
         if save_to_path is not None:
             torch.save(self.state_dict(), save_to_path)
 
-        return test_lb, test_kl_div, run_times, its
+        return test_lb, test_ELBO, test_kl_div, run_times, its
