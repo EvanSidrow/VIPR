@@ -8,6 +8,7 @@ import pickle
 import datetime
 from scipy.special import logsumexp
 import os
+import sys
 
 from Bio.Phylo.TreeConstruction import _DistanceMatrix
 from Bio.Phylo.TreeConstruction import DistanceTreeConstructor
@@ -15,6 +16,7 @@ from Bio.Phylo.TreeConstruction import DistanceCalculator
 from io import StringIO
 from Bio import Phylo
 
+sys.path.append('/Users/evsi8432/Documents/Research/VBPI-matrix/src')
 from tree_torch import Tree
 from SLCVI_torch import SLCVI
 
@@ -28,14 +30,14 @@ parser.add_argument('--pid', type=int, required=True, help=' HCV ')
 parser.add_argument('--prev_file', type=str, default=None, help=' HCV ')
 args = parser.parse_args()
 
-datasets = ["DS14","DS14","DS14"]
+datasets = ["DS14_6","DS14_24","DS14_3","DS14","DS14_12","DS14_48"]
 methods = ["reparam","reinforce","VIMCO"]
-alphas = [0.03,0.03,0.03]
+alphas = [0.03]
 
-method = methods[args.pid]
-dataset = datasets[args.pid]
-alpha = alphas[args.pid]
+method = methods[args.pid % 3]
+dataset = datasets[int(args.pid/3) % 6]
 rand_seed = 0
+alpha = 0.03
 
 np.random.seed(rand_seed)
 torch.manual_seed(rand_seed)
@@ -43,7 +45,7 @@ torch.manual_seed(rand_seed)
 # keep fixed values
 decay = "exp"
 batch_size = 10
-max_iters = 10000
+max_iters = 1000
 record_every = 10
 test_batch_size = 10
 if decay == "linear":
@@ -51,9 +53,9 @@ if decay == "linear":
 else:
     linear_decay = False
 anneal_freq = 1
-anneal_rate = 0.01**(1.0/10000)
+anneal_rate = 0.01**(1.0/1000)
 pop_size = 5.0
-max_time = 48.0 # HOURS
+max_time = 1.0/6 # HOURS
 
 # select output file
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')

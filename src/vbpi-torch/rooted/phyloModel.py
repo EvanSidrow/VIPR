@@ -66,7 +66,6 @@ class PHY(object):
     def logprior(self, log_branch):
         return -torch.sum(torch.exp(log_branch)/self.scale + np.log(self.scale) - log_branch, -1)
 
-
     def loglikelihood(self, branch, tree):
         branch_D = torch.einsum("i,j->ij", (branch, self.D))
         transition_matrix = torch.matmul(torch.einsum("ij,kj->kij", (self.U, torch.exp(branch_D))), self.U_inv).clamp(0.0)

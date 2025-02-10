@@ -35,7 +35,7 @@ parser.add_argument('--stepszTree', type=float, default=0.001, help=' step size 
 parser.add_argument('--stepszBranch', type=float, default=0.001, help=' step size for branch length parameters ')
 parser.add_argument('--stepszCoalescent', type=float, default=0.001, help=' step size for coalescent parameters ')
 parser.add_argument('--stepszClock', type=float, default=0.001, help=' step size for clock rate parameters ')
-parser.add_argument('--maxIter', type=int, default=1000, help=' number of iterations for training')
+parser.add_argument('--maxIter', type=int, default=10, help=' number of iterations for training')
 parser.add_argument('--invT0', type=float, default=0.001, help=' initial inverse temperature for annealing schedule ')
 parser.add_argument('--nwarmStart', type=int, default=50000, help=' number of warm start iterations ')
 parser.add_argument('--nParticle', type=int, default=10, help=' number of particles for variational objectives ')
