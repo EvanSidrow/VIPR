@@ -30,7 +30,7 @@ parser.add_argument('--sample_info', default=False, action='store_true', help=' 
 parser.add_argument('--psp', default=False, action='store_true', help=' use psp parameterization ')
 
 ########## Optimizer arguments
-parser.add_argument('--max_time', type=float, default=12.0)
+parser.add_argument('--max_time', type=float, default=18.0)
 parser.add_argument('--stepszTree', type=float, default=0.001, help=' step size for tree topology parameters')
 parser.add_argument('--stepszBranch', type=float, default=0.001, help=' step size for branch length parameters ')
 parser.add_argument('--stepszCoalescent', type=float, default=0.001, help=' step size for coalescent parameters ')
@@ -120,8 +120,8 @@ print('\nVBPI running, results will be saved to: {}\n'.format(args.save_to_path)
 # run vbpi.
 # the trained model will be saved to 'results/DS1/mcmc_vimco_10_psp_constant_fixed.pt'.
 test_lb, test_ELBO, test_kl_div, run_times, its = model.learn(args.alpha, maxiter=args.maxIter, max_time=args.max_time,
-                                                   n_particles=args.nParticle, warm_start_interval=args.nwarmStart,
-                                                   method='vimco',save_to_path=args.save_to_path)
+                                                              n_particles=args.nParticle, warm_start_interval=args.nwarmStart,
+                                                              method='vimco',save_to_path=args.save_to_path)
 
 np.save(args.save_to_path.replace('.pt', '_test_lb.npy'), test_lb)
 np.save(args.save_to_path.replace('.pt', '_test_ELBO.npy'), test_ELBO)

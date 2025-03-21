@@ -7,13 +7,16 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-type=REQUEUE
 #SBATCH --mail-type=ALL
+#SBATCH --
 
 #SBATCH --time=23:59:00
 #SBATCH --mem-per-cpu=16G
-#SBATCH --array=0-383
+#SBATCH --array=0-479
 
 module load StdEnv/2023
 module load scipy-stack/2024b
+
+cat /proc/cpuinfo | grep "model name" | head -n1
 
 python src/vbpi-torch/rooted/main_slurm.py --pid $SLURM_ARRAY_TASK_ID \
 --coalescent_type fixed_pop --clock_type fixed_rate --init_clock_rate 1.0 \

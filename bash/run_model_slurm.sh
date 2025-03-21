@@ -10,9 +10,12 @@
 
 #SBATCH --time=23:59:00
 #SBATCH --mem-per-cpu=16G
-#SBATCH --array=0-575
+#SBATCH --array=0-719
 
 module load StdEnv/2023
 module load scipy-stack/2024b
 
-python src/train_model_slurm.py --pid $SLURM_ARRAY_TASK_ID
+# tell the cpu and model name on linux
+cat /proc/cpuinfo | grep "model name" | head -n1 | cut -d ":" -f2 | cut -d " " -f2
+
+python src/train_model.py --pid $SLURM_ARRAY_TASK_ID
