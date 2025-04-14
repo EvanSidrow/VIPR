@@ -94,17 +94,17 @@ for i in range(10):
 
 theta = torch.zeros((2,ntaxa,ntaxa))
 trees = Phylo.parse(StringIO(treedata), "newick")
-log_dists = np.zeros((ntrees,ntaxa,ntaxa))
+dists = np.zeros((ntrees,ntaxa,ntaxa))
 
 for i,tree in enumerate(trees):
     for j in range(ntaxa):
         for k in range(j):
-            log_dists[i,j,k] = np.log(tree.distance(target1=str(j+1),target2=str(k+1))/2.0)
+            dists[i,j,k] = np.log(tree.distance(target1=str(j+1),target2=str(k+1))/2.0)
 
 for j in range(ntaxa):
     for k in range(j):
-        theta[0,j,k] = np.mean(log_dists[:,j,k])
-        theta[1,j,k] = np.log(np.std(log_dists[:,j,k]))
+        theta[0,j,k] = np.mean(dists[:,j,k])
+        theta[1,j,k] = np.var(dists[:,j,k])
 
 # add random noise
 if rand_seed > 0:
@@ -116,7 +116,7 @@ if args.prev_file:
     with open(args.prev_file, 'rb') as f:
         optim = pickle.load(f)
 else:
-    optim = VIPR(genomes,theta,pop_size)
+    optim = VIPR(genomes,theta[0],theta[1],pop_size)
 
 print("Training model.. \n")
 optim.learn(batch_size=batch_size,

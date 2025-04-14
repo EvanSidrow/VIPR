@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.distributions.log_normal import LogNormal
 from torch.distributions.gamma import Gamma
+from torch.distributions.exponential import Exponential
+from torch.distributions.categorical import Categorical
 torch.set_default_dtype(torch.float32)
 
 import time
@@ -30,6 +32,15 @@ class VIPR(nn.Module):
             mus = torch.tril(torch.log(means**2 / torch.sqrt(vars + means**2)),diagonal=-1)
             log_sigs = torch.tril(torch.log(torch.sqrt(torch.log(1 + vars / means**2))),diagonal=-1)
             self.theta = nn.Parameter(torch.stack([mus,log_sigs]))
+        elif var_dist == "Exponential":
+            log_lambs = torch.tril(-torch.log(means),diagonal=-1)
+            self.theta = nn.Parameter(log_lambs)
+        elif var_dist == "Mixture":
+            logit_pis = 4.0*torch.ones(self.ntaxa,self.ntaxa)
+            mus = torch.tril(torch.log(means**2 / torch.sqrt(vars + means**2)),diagonal=-1)
+            log_sigs = torch.tril(torch.log(torch.sqrt(torch.log(1 + vars / means**2))),diagonal=-1)
+            log_lambs = torch.tril(-torch.log(means),diagonal=-1)
+            self.theta = nn.Parameter(torch.stack([logit_pis,mus,log_sigs,log_lambs]))
         else:
             raise NotImplementedError
 
@@ -132,6 +143,17 @@ class VIPR(nn.Module):
             return Gamma(torch.exp(theta[0]), torch.exp(theta[1]))
         elif self.var_dist == "LogNormal":
             return LogNormal(theta[0], torch.exp(theta[1]))
+        elif self.var_dist == "Exponential":
+            return Exponential(torch.exp(theta))
+        elif self.var_dist == "Mixture":
+            #logit_pis = torch.stack([theta[0],torch.zeros_like(theta[0])],dim=-1)
+            pis = torch.softmax(torch.stack([theta[0],
+                                             torch.zeros_like(theta[0])],
+                                            dim=-1),-1)
+            mus = theta[1]
+            sigs = torch.exp(theta[2])
+            lambs = torch.exp(theta[3])
+            return [Categorical(pis),LogNormal(mus,sigs),Exponential(lambs)]
         else:
             raise NotImplementedError
 
@@ -149,16 +171,22 @@ class VIPR(nn.Module):
             Wn_grid, Zn_grid = torch.meshgrid(Wn, Zn, indexing='ij')
             rowinds = torch.max(Wn_grid.flatten(), Zn_grid.flatten())
             colinds = torch.min(Wn_grid.flatten(), Zn_grid.flatten())
-
             dist = self.get_var_dist(self.theta[:,rowinds,colinds])
 
-            try:
+            if type(dist) == list:
+                pis = torch.softmax(torch.stack([self.theta[0,rowinds,colinds],
+                                    torch.zeros_like(self.theta[0,rowinds,colinds])],
+                                    dim=-1),-1)
+                #log_sfs = torch.log(1.0 - dist[1].cdf(t))
+                #log_pdfs = dist[1].log_prob(t)
+                log_sfs = torch.log(pis[:,0]*(1.0 - dist[1].cdf(t)) + pis[:,1]*(1.0 - dist[2].cdf(t)))
+                log_pdfs = torch.logsumexp(torch.stack([torch.log(pis[:,0]) + dist[1].log_prob(t),
+                                                        torch.log(pis[:,1]) + dist[2].log_prob(t)]),0)
+
+            else:
                 log_sfs = torch.log(1.0 - dist.cdf(t))
                 log_pdfs = dist.log_prob(t)
-            except:
-                print(self.theta[:,rowinds,colinds])
-                print(t)
-                raise ValueError("Error in cdf or pdf calculation")
+
 
             log_q += torch.sum(log_sfs) + torch.logsumexp(log_pdfs - log_sfs,0)
 
@@ -170,17 +198,28 @@ class VIPR(nn.Module):
 
         # sample T
         dist = self.get_var_dist(self.theta)
-        if detach:
-            times = dist.sample()
+
+        if type(dist) == list:
+            if detach:
+                inds = dist[0].sample()
+                times = dist[1].sample()
+                times[inds == 1] = dist[2].sample()[inds == 1]
+            else:
+                print("cannot currently do reparam trick with mixture")
+                raise NotImplementedError
         else:
-            times = dist.rsample()
+            if detach:
+                times = dist.sample()
+            else:
+                times = dist.rsample()
+
         times = times + torch.triu(torch.full((self.ntaxa,self.ntaxa), float("Inf")))
         times0 = times.detach().numpy()
 
         # perform single linkage clustering
         try:
             Z = linkage([times0[ind[1],ind[0]] for ind in combinations(range(self.ntaxa),2)], 
-                        method="single")
+                         method="single")
         except:
             print([times0[ind[1],ind[0]] for ind in combinations(range(self.ntaxa),2)])
             raise ValueError("Error in linkage calculation")
@@ -190,11 +229,18 @@ class VIPR(nn.Module):
         if not detach:
             rowinds,colinds = np.where(np.isin(times0,Z[:,2]))
             new_Z2 = torch.sort(times[rowinds,colinds])[0]
+
+            # check if Z2 is too short
+            if len(new_Z2) < len(Z[:,2]):
+                rowinds,colinds = np.where(np.isclose(times0,Z[:,2]))
+                new_Z2 = torch.sort(times[rowinds,colinds])[0]
+
+            # check if Z2 is too long
             if len(new_Z2) > len(Z[:,2]):
                 first_mask = [True] + [(new_Z2[i+1] != new_Z2[i]).item() for i in range(len(new_Z2)-1)]
                 new_Z2 = new_Z2[torch.tensor(first_mask)]
 
-            Z[:,2] = new_Z2
+            Z[:,2] = new_Z2              
 
         return Z
 

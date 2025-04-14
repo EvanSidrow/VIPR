@@ -30,14 +30,14 @@ parser.add_argument('--sample_info', default=False, action='store_true', help=' 
 parser.add_argument('--psp', default=False, action='store_true', help=' use psp parameterization ')
 
 ########## Optimizer arguments
-parser.add_argument('--max_time', type=float, default=1.0/6)
+parser.add_argument('--max_time', type=float, default=5.0/60.0)
 parser.add_argument('--stepszTree', type=float, default=0.001, help=' step size for tree topology parameters')
 parser.add_argument('--stepszBranch', type=float, default=0.001, help=' step size for branch length parameters ')
 parser.add_argument('--stepszCoalescent', type=float, default=0.001, help=' step size for coalescent parameters ')
 parser.add_argument('--stepszClock', type=float, default=0.001, help=' step size for clock rate parameters ')
-parser.add_argument('--maxIter', type=int, default=10, help=' number of iterations for training')
-parser.add_argument('--invT0', type=float, default=0.001, help=' initial inverse temperature for annealing schedule ')
-parser.add_argument('--nwarmStart', type=int, default=50000, help=' number of warm start iterations ')
+parser.add_argument('--maxIter', type=int, default=1000, help=' number of iterations for training')
+parser.add_argument('--invT0', type=float, default=1.0, help=' initial inverse temperature for annealing schedule ')
+parser.add_argument('--nwarmStart', type=int, default=1, help=' number of warm start iterations ')
 parser.add_argument('--nParticle', type=int, default=10, help=' number of particles for variational objectives ')
 parser.add_argument('--ar', type=float, default=0.75, help=' step size anneal rate ')
 parser.add_argument('--af', type=int, default=20000, help=' step size anneal frequency ')
@@ -47,11 +47,16 @@ parser.add_argument('--gradMethod', type=str, default='vimco', help=' vimco | rw
 
 args = parser.parse_args()
 
-datasets = ["DS14_6","DS14_24","DS14_3","DS14","DS14_12","DS14_48"]
+datasets = ["taxa_00008","taxa_00016","taxa_00032",
+            "taxa_00064","taxa_00128","taxa_00256",
+            "taxa_00512"]
+#datasets = ["DS14_3","DS14_6","DS14_12","DS14_24","DS14_48","DS14_72"]
+#datasets = ["taxa_00512","taxa_01024"]
+
 batch_sizes = [10,20]
 
-args.dataset = datasets[args.pid % 6]
-args.nParticle = batch_sizes[int(args.pid/6) % 2]
+args.nParticle = batch_sizes[args.pid % 2]
+args.dataset = datasets[int(args.pid/2) % 7]
 args.alpha = 0.001
 rand_seed = 0
 
@@ -59,6 +64,8 @@ np.random.seed(rand_seed)
 torch.manual_seed(rand_seed)
 
 args.result_folder = 'results/' + args.dataset
+if not os.path.exists(args.result_folder):
+    os.makedirs(args.result_folder)
 args.save_to_path = args.result_folder + '/' + args.supportType + '_' + args.gradMethod + '_' + str(args.nParticle) + '_' + str(args.alpha)
 if args.psp:
     args.save_to_path = args.save_to_path + '_psp'

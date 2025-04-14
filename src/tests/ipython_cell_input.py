@@ -39,11 +39,11 @@ np.random.seed(0)
 
 data_set = "DS1"
 pop_size = 5.0 # exponential parameter for constant pop size prior
-data_file = '../dat/'+data_set+'/'+data_set+'.pickle'
+data_file = '../../dat/'+data_set+'/'+data_set+'.pickle'
 time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-reparam_file = '../results/'+data_set+'/'+data_set+'_'+time+'_reparam.pickle'
-reinforce_file = '../results/'+data_set+'/'+data_set+'_'+time+'_reinforce.pickle'
-VIMCO_file = '../results/'+data_set+'/'+data_set+'_'+time+'_VIMCO.pickle'
+reparam_file = '../../results/'+data_set+'/'+data_set+'_'+time+'_reparam.pickle'
+reinforce_file = '../../results/'+data_set+'/'+data_set+'_'+time+'_reinforce.pickle'
+VIMCO_file = '../../results/'+data_set+'/'+data_set+'_'+time+'_VIMCO.pickle'
 
 ### load in data
 
@@ -66,7 +66,7 @@ nuc2vec = {'A':[1.,0.,0.,0.], 'G':[0.,1.,0.,0.], 'C':[0.,0.,1.,0.], 'T':[0.,0.,0
 treedata = ""
 ntrees = 0
 for i in range(1):
-    tree_file = "../dat/"+data_set+"/"+data_set+"_fixed_pop_support_short_run_rep_%d.trees"%(i+1)
+    tree_file = "../../dat/"+data_set+"/"+data_set+"_fixed_pop_support_short_run_rep_%d.trees"%(i+1)
     with open(tree_file, "r") as file:
         for line in file:
             if line.startswith("tree STATE"):
