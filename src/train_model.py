@@ -81,7 +81,7 @@ ntaxa = len(species)
 treedata = ""
 ntrees = 0
 
-print("Initializing theta... \n")
+print("Initializing phi... \n")
 for i in range(10):
     tree_file = "dat/"+dataset+"/"+dataset+"_fixed_pop_support_short_run_rep_%d.trees"%(i+1)
     with open(tree_file, "r") as file:
@@ -92,7 +92,7 @@ for i in range(10):
                 treedata = treedata + line + "\n"
                 ntrees += 1
 
-theta = torch.zeros((2,ntaxa,ntaxa))
+phi = torch.zeros((2,ntaxa,ntaxa))
 trees = Phylo.parse(StringIO(treedata), "newick")
 dists = np.zeros((ntrees,ntaxa,ntaxa))
 
@@ -103,12 +103,12 @@ for i,tree in enumerate(trees):
 
 for j in range(ntaxa):
     for k in range(j):
-        theta[0,j,k] = np.mean(dists[:,j,k])
-        theta[1,j,k] = np.var(dists[:,j,k])
+        phi[0,j,k] = np.mean(dists[:,j,k])
+        phi[1,j,k] = np.var(dists[:,j,k])
 
 # add random noise
 if rand_seed > 0:
-    theta = theta + torch.normal(mean=0.0,std=rand_seed*0.1,size=(2,ntaxa,ntaxa))
+    phi = phi + torch.normal(mean=0.0,std=rand_seed*0.1,size=(2,ntaxa,ntaxa))
 
 #######
 
@@ -116,7 +116,7 @@ if args.prev_file:
     with open(args.prev_file, 'rb') as f:
         optim = pickle.load(f)
 else:
-    optim = VIPR(genomes,theta[0],theta[1],pop_size)
+    optim = VIPR(genomes,phi[0],phi[1],pop_size)
 
 print("Training model.. \n")
 optim.learn(batch_size=batch_size,

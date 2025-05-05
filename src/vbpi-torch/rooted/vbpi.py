@@ -144,7 +144,7 @@ class VBPI(nn.Module):
         logp_clock_rate = self.clock_model(log_clock_rate)
 
         logp_joint = inverse_temp * logll + logp_coalescent_prior + logp_clock_rate
-        lower_bound = torch.logsumexp(logll + logp_coalescent_prior + logp_clock_rate - logq_tree - logq_height - logq_prior -logq_clock_rate - math.log(n_particles), 0)
+        lower_bound = torch.logsumexp(logll + logp_coalescent_prior + logp_clock_rate - logq_tree - logq_height - logq_prior - logq_clock_rate - math.log(n_particles), 0)
 
         l_signal = logp_joint - logq_tree - logq_height - logq_prior - logq_clock_rate
         mean_exclude_signal = (torch.sum(l_signal) - l_signal) / (n_particles-1.)

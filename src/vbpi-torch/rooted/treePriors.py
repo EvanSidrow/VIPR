@@ -12,7 +12,6 @@ class BaseCoalescent(nn.Module):
         super().__init__()
         self.now = now
 
-
     def get_coalescent_info(self, height, event_info, grid=False):
         self.height = height
         if grid:
@@ -29,7 +28,6 @@ class BaseCoalescent(nn.Module):
         self.intervals = self.event_time[:-1] - self.event_time[1:]
         self.coalescent_event_mask = torch.cat((self.event_info==1, torch.ByteTensor([0])))
         self.cf = lineages * (lineages - 1) / 2.
-
 
     def get_batch_coalescent_info(self, height, event_info, event_idxes=None, grid=False):
         self.height = height
@@ -98,7 +96,7 @@ class FixedPopCoalescent(BaseCoalescent):
         return math.exp(self.log_pop_size)
 
 class ConstantCoalescent(BaseCoalescent):
-    def __init__(self, *args, mu_0=-0.0049, sigma_0=2.148, log_pop_size_offset=10., **kwargs):
+    def __init__(self, *args, mu_0=-0.0049, sigma_0=2.148, log_pop_size_offset=0., **kwargs):
         super().__init__()
         self.mu, self.sigma = mu_0, sigma_0
         self.log_pop_size_offset = log_pop_size_offset
