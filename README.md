@@ -54,6 +54,8 @@ Run the "plot_results.ipynb" jupyter notebook to interactively plot the results.
 
 ### BEAST
 
+Run the following command in a terminal:
+
 `bash src/run_beast_comp.sh DATASET` 
 
 for all datasets: taxa_00008, taxa_00016, taxa_00032, taxa_00064, taxa_00128, taxa_00256, taxa_00512
