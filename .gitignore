@@ -1,6 +1,14 @@
-dat/
+dat/*/*
+!dat/*/*.nexus
+!dat/*/*.pickle
+!dat/*/*.xml
+!dat/*/*_MCC.tree
 ref/
 doc/
 results/
 plt/
 tmp/
+.ipynb_checkpoints/
+*.pyc
+src/__pycache__/
+src/.ipynb_checkpoints/

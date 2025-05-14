@@ -115,16 +115,15 @@ class VIPR(nn.Module):
     def logprior(self,linkage_matrix,pop_size):
 
         # Combine and sort all time points (tips + coalescent times)
-        times = torch.concatenate([self.tip_dates, linkage_matrix[:,2]])
-        events = torch.concatenate([torch.ones(self.ntaxa), -torch.ones(self.ntaxa-1)])  # 1: tip, -1: coalescent
+        times = torch.cat([self.tip_dates, linkage_matrix[:,2]])
+        events = torch.cat([torch.ones(self.ntaxa), -torch.ones(self.ntaxa-1)])  # 1: tip, -1: coalescent
 
         # Sort by time
-        sorted_indices = np.argsort(times)
+        sorted_indices = torch.argsort(times)
         times = times[sorted_indices]
         events = events[sorted_indices]
-
-        ks = torch.cat([torch.tensor([0]),torch.cumsum(events,0)[:-1]])
-        ts = torch.diff(times,prepend=torch.tensor([0.0]))
+        ks = torch.cat([torch.zeros(1),torch.cumsum(events,0)[:-1]])
+        ts = torch.diff(times,prepend=torch.zeros(1))
 
         # only include interval times with at least 2 taxa
         ts = ts[ks > 1]
@@ -148,7 +147,7 @@ class VIPR(nn.Module):
         log_prior -= torch.sum(rates[tip_inds]*ts[tip_inds])
 
         return log_prior
-
+    
         #ts = torch.diff(linkage_matrix[:,2],prepend=torch.tensor([0.0]))
         #ks = torch.tensor(range(self.ntaxa,1,-1))
         #rates = ks*(ks-1) / (2*pop_size)
@@ -340,7 +339,7 @@ class VIPR(nn.Module):
     
     def sample_q_pop_size(self,detach=True):
         if self.var_dist_pop_size == "Fixed":
-            return self.phi_pop_size[0]
+            return self.phi_pop_size[0].detach()
         elif self.var_dist_pop_size == "LogNormal":
             if detach:
                 return LogNormal(self.phi_pop_size[0], torch.exp(self.phi_pop_size[1])).sample()
@@ -351,7 +350,7 @@ class VIPR(nn.Module):
         
     def sample_q_rate(self,detach=True):
         if self.var_dist_rate == "Fixed":
-            return self.phi_rate[0]
+            return self.phi_rate[0].detach()
         elif self.var_dist_rate == "LogNormal":
             if detach:
                 return LogNormal(self.phi_rate[0], torch.exp(self.phi_rate[1])).sample()
@@ -382,9 +381,12 @@ class VIPR(nn.Module):
             log_q = self.logvariational(Z) + self.logvariational_pop_size(pop_size) + self.logvariational_rate(rate)
 
             # store ELBO
-            ELBO_hats[i] = (log_ll + log_prior - log_q).detach()
+            ELBO_hats[i] = log_ll + log_prior - log_q
             log_qs[i] = log_q
 
+        if detach:
+            ELBO_hats = ELBO_hats.detach()
+  
         return ELBO_hats, log_qs
 
     def multisample_ELBO_reparam(self,batch_size,detach=False):
@@ -455,7 +457,7 @@ class VIPR(nn.Module):
         return
 
     def learn(self,batch_size,iters,alpha,method="reparam",
-              anneal_freq=1,anneal_rate=1.0,record_every=100,test_batch_size=500,
+              lr_decay_freq=1,lr_decay_rate=1.0,record_every=100,test_batch_size=500,
               pop_size=None,max_time=12.0,linear_decay=False):
 
         if not pop_size is None:
@@ -497,8 +499,8 @@ class VIPR(nn.Module):
                 self.record_metrics(it,test_batch_size)
             if linear_decay:
                 self.optimizer.param_groups[0]['lr'] = alpha*(1-it/iters)
-            elif it % anneal_freq == 0:
-                self.optimizer.param_groups[0]['lr'] *= anneal_rate
+            elif it % lr_decay_freq == 0:
+                self.optimizer.param_groups[0]['lr'] *= lr_decay_rate
 
             if (np.sum(self.run_times) / 3600) > max_time:
                 print("Maximum time exceeded. Exiting...")
