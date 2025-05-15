@@ -9,6 +9,8 @@ Beast version is 1.10.4.
 
 All experiments are set to run for 10,000 iterations, but it is straightforward to increase the number of iterations by changing the command line arguments below.
 
+After running BEAST, we plotted histograms of pair-wise coalescent times across sampled trees for all datasets. The `supmat/hists` directory contains .zip files of all such histograms.
+
 ## Running primary experiments
 
 ### BEAST
@@ -82,7 +84,7 @@ with all combinations of the following settings:
     - datasets: taxa_00008, taxa_00016, taxa_00032, taxa_00064, taxa_00128, taxa_00256, taxa_00512
     - methods: reparam, reinforce, VIMCO
 
-### plot results
+### Plotting results
 
 Run the "plot_comp.ipynb" jupyter notebook to interactively plot the results.
 
